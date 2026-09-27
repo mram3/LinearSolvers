@@ -1,70 +1,64 @@
 #include "Equations.h"
 
+#include <cmath>
+
 using namespace std;
 
-void Equations::assemblePoissonMatrix
-(
-    int Nx,
-    int Ny
-) {
-    //creating a test matrix to check the preconditioner performance
-    for (int i = 0; i < Nx; ++i) {
-        for (int j = 0; j < Ny; ++j) {
-            
-            int cell_P = i * Ny + j; 
-            
-            double a_P = 0.0; //diagonal co efficient
-            double Su = 1.0;  //source term (taken as 1.0)
+const double PI = acos(-1.0);
 
-            // Boundary conditions
-            double phi_West  = 0.0;
-            double phi_South = 0.0;
-            double phi_East  = 1.0;
-            double phi_North = 1.0;
+void Equations::assemblePoissonMatrix() 
+{
+    int xCells = mesh->Nx, yCells = mesh->Ny, rowIdx;
+    double dx = mesh->dx, dy = mesh->dy, dV = dx*dy;
 
-            // 1. WEST FACE (i - 1)
-            if (i > 0) { // Internal face
-                int cell_W = (i - 1) * Ny + j;
-                A.addCoeff(cell_P, cell_W, -1.0);
-                a_P += 1.0;
-            } else {                        // Boundary face
-                a_P += 2.0;                 // cell center to boundary is half the cell thickness
-                Su += 2.0 * phi_West;       // moving the boundary term to RHS
+    //Boundary conditions
+    double phiEast = 0.0;
+    double phiWest = 0.0;
+    double phiNorth = 0.0;
+    double phiSouth = 0.0;
+    
+    b.assign(xCells * yCells, 0.0);
+
+    for(int j = 0; j < yCells; ++j){
+        for(int i = 0; i < xCells; ++i){
+
+            double aW = -1.0*dy/dx, aE = -1.0*dy/dx, aS = -1.0*dx/dy, aN = -1.0*dx/dy, aP;
+            double Su = 0.0, Sp = 0.0;
+
+            if(i == 0){
+                aW = 0.0;
+                Su += phiWest * 2.0*dy/dx;
+                Sp += 2.0*dy/dx;
+            }
+            else if(i == xCells-1){
+                aE = 0.0;
+                Su += phiEast * 2.0*dy/dx;
+                Sp += 2.0*dy/dx;
             }
 
-            // 2. EAST FACE (i + 1)
-            if (i < Nx - 1) { 
-                int cell_E = (i + 1) * Ny + j;
-                A.addCoeff(cell_P, cell_E, -1.0);
-                a_P += 1.0;
-            } else {     
-                a_P += 2.0; 
-                Su += 2.0 * phi_East;
+            if(j == 0){
+                aS = 0.0;
+                Su += phiSouth * 2.0*dx/dy;
+                Sp += 2.0*dy/dx;
+            }
+            else if(j == yCells-1){
+                aN = 0.0;
+                Su += phiNorth * 2.0*dx/dy;
+                Sp += 2.0*dx/dy;
             }
 
-            // 3. SOUTH FACE (j - 1)
-            if (j > 0) { 
-                int cell_S = i * Ny + (j - 1);
-                A.addCoeff(cell_P, cell_S, -1.0);
-                a_P += 1.0;
-            } else {     
-                a_P += 2.0;
-                Su += 2.0 * phi_South;
-            }
+            aP = - (aW+aE+aN+aS-Sp);
 
-            // 4. NORTH FACE (j + 1)
-            if (j < Ny - 1) { 
-                int cell_N = i * Ny + (j + 1);
-                A.addCoeff(cell_P, cell_N, -1.0);
-                a_P += 1.0;
-            } else {     
-                a_P += 2.0;
-                Su += 2.0 * phi_North;
-            }
+            rowIdx = j * xCells + i;
+            A.addCoeff(rowIdx, rowIdx, aP);
 
-            // 5. ADD DIAGONAL AND RHS
-            A.addCoeff(cell_P, cell_P, a_P);
-            b.push_back(Su);
+            if(aW != 0.0) A.addCoeff(rowIdx, rowIdx-1, aW);
+            if(aE != 0.0) A.addCoeff(rowIdx, rowIdx+1, aE);
+            if(aS != 0.0) A.addCoeff(rowIdx, rowIdx-xCells,aS);
+            if(aN != 0.0) A.addCoeff(rowIdx, rowIdx+xCells,aN);
+
+
+            b[rowIdx] = 2*PI*PI*sin(PI*mesh->x[i])*sin(PI*mesh->y[j])*dV + Su;
         }
     }
 

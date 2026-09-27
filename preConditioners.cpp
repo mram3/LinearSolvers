@@ -22,7 +22,7 @@ int main(){
     Equations eqn; 
     LinearSolvers solve;
  
-    eqn.assemblePoissonMatrix(Nx, Ny); // creates a square matrix of NCells*NCells
+    //eqn.assemblePoissonMatrix(Nx, Ny); // creates a square matrix of NCells*NCells
     
     jacobiPreconditioner jP; 
     sorPreconditioner gS(1.0);
