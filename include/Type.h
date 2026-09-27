@@ -8,4 +8,10 @@ enum class Side{
     None
 };
 
+enum class Cycle{
+    vCycle,
+    wCycle,
+    fCycle
+};
+
 #endif
