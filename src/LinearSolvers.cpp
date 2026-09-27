@@ -1,4 +1,5 @@
 #include "LinearSolvers.h"
+#include "GMG.h"
 
 #include <iostream>
 #include <cmath>
@@ -195,5 +196,76 @@ void LinearSolvers::directLU
             sum += A[i][j] * x[j]; // A[i][j] acts as U
         }
         x[i] = (y[i] - sum) / A[i][i]; // A[i][i] acts as U_ii
+    }
+}
+
+int LinearSolvers::GMG
+(
+    std::vector<Equations>& levels,
+    std::vector<double>& x,
+    double tolarance,
+    Cycle cycle
+)
+{
+    double r, r0;
+    int iter = 0, maxIter = 1000;
+
+    vector<double> z = levels[0].A.SpMV(x);
+    r0 = MathTools::L2Norm(MathTools::vectorSub(levels[0].b, z));
+    r = r0;
+
+    if(r0 < std::numeric_limits<double>::epsilon()) return iter;
+
+    switch (cycle)
+    {
+    case Cycle::vCycle:
+        while(iter < maxIter && r/r0 > tolarance){
+            GMG::vCycle(levels, x);
+            z = levels[0].A.SpMV(x);
+            r = MathTools::L2Norm(MathTools::vectorSub(levels[0].b, z));
+            iter++;
+        }
+        if(iter==maxIter) cout << "Does not converge.\n";
+        break;
+    }
+
+    return iter;
+}
+
+void LinearSolvers::gaussSeidel
+(
+    const Matrix& A, 
+    const std::vector<double>& b,
+    std::vector<double>& x,
+    int maxIter
+)
+{
+    const auto& rowPtr = A.getrowPtr();
+    const auto& col = A.getcol();
+    const auto& values = A.getvalues();
+
+    int n = rowPtr.size() - 1, iter = 0;
+    vector<double> diag(n, 1.0);
+
+    for(int i = 0; i < n; ++i){
+        for(int j = rowPtr[i]; j < rowPtr[i+1]; ++j){
+            if(i == col[j]){
+                diag[i] = values[j];
+                break;
+            }
+        }
+    }
+
+    while(iter < maxIter){
+        for(int i = 0; i < n; ++i){
+            double sum = b[i];
+            for(int j = rowPtr[i]; j < rowPtr[i+1]; ++j){
+                if(i != col[j]){
+                    sum -= values[j]*x[col[j]];
+                }
+            }
+            x[i] = sum/diag[i];
+        }
+        iter++;
     }
 }
