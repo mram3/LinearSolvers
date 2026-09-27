@@ -1,6 +1,7 @@
 # Ignore compiled executables
 *.exe
 main
+test
 
 *.csv
 *.png
