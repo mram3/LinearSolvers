@@ -1,5 +1,5 @@
 /*
-Compiling Instruction: g++ main.cpp src/*.cpp -Iinclude -std=c++17 -o main && ./main
+Compiling Instruction: g++ preConditioners.cpp src/*.cpp -Iinclude -std=c++17 -O3 -march=native -o main && ./main
 */
 #include <iostream>
 #include <vector>
@@ -13,13 +13,17 @@ using namespace std;
 using namespace std::chrono;
 
 int main(){
-    int Nx = 10; // number of cells along x axis
-    int Ny = 10; // number of cells along y axis
+    int Nx = 10;
+    int Ny = 10;
+    double xmin = 0.0, xmax = 1.0;
+    double ymin = 0.0, ymax = 1.0;
+    int NCells = Nx*Ny;
 
-    int NCells = Nx * Ny;
     std::vector<double> x(NCells, 0.0); // initialize the solution vector
 
-    Equations eqn; 
+    Grid mesh(Nx, Ny, xmin, xmax, ymin, ymax);
+    Equations eqn(&mesh); 
+    eqn.assemblePoissonMatrix();
     LinearSolvers solve;
  
     //eqn.assemblePoissonMatrix(Nx, Ny); // creates a square matrix of NCells*NCells
@@ -128,7 +132,7 @@ int main(){
     
     cout << "--------------------------------------------------------------------------------------\n";
     
-    // Error for Exact LU is 0.0 because it is the reference vector itself
+    //Error for Exact LU is 0.0 because it is the reference vector itself
     cout << left << setw(30) << "Exact Dense LU"       << setw(15) << "N/A" << fixed << setw(20) << timeLU   << scientific << 0.0     << endl;
     cout << left << setw(30) << "Exact Dense Cholesky" << setw(15) << "N/A" << fixed << setw(20) << timeChol << scientific << errChol << endl;
     cout << "======================================================================================\n";
