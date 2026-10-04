@@ -49,5 +49,30 @@ public:
         int maxIter
     );
 
+    static int PCG
+    (
+        const Matrix& A,
+        const Preconditioners& M,
+        std::vector<double>& x,
+        const std::vector<double>& rhs,
+        double tolarance
+    );
+
+    static int PBiCGStab
+    (
+        const Matrix& A,
+        const Preconditioners& M,
+        std::vector<double>& x,
+        const std::vector<double>& rhs,
+        double tolarance
+    );
+
+    static int steepestDescent
+    (
+        const Matrix& A,
+        std::vector<double>& x,
+        const std::vector<double>& rhs,
+        double tolarance
+    );
 };
 #endif

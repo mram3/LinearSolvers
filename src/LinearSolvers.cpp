@@ -216,19 +216,18 @@ int LinearSolvers::GMG
 
     if(r0 < std::numeric_limits<double>::epsilon()) return iter;
 
-    switch (cycle)
-    {
-    case Cycle::vCycle:
-        while(iter < maxIter && r/r0 > tolarance){
-            GMG::vCycle(levels, x);
-            z = levels[0].A.SpMV(x);
-            r = MathTools::L2Norm(MathTools::vectorSub(levels[0].b, z));
-            iter++;
-        }
-        if(iter==maxIter) cout << "Does not converge.\n";
-        break;
+    while(iter < maxIter && r/r0 > tolarance){
+        
+        //triggering the recursion here
+        GMG::runCycles(0, levels, x, levels[0].b, cycle);
+
+        //calculating the residual
+        z = levels[0].A.SpMV(x);
+        r = MathTools::L2Norm(MathTools::vectorSub(levels[0].b, z));
+        iter++;
     }
 
+    if(iter==maxIter) cout << "Does not converge.\n";
     return iter;
 }
 
@@ -268,4 +267,205 @@ void LinearSolvers::gaussSeidel
         }
         iter++;
     }
+}
+
+int LinearSolvers::PCG
+(
+    const Matrix& A,
+    const Preconditioners& M,
+    vector<double>& x,
+    const vector<double>& rhs,
+    double tolarance
+)
+{
+    int maxIter = 10000, iter = 0;
+
+    //brief PCG (Yousef Saad - Iterative Methods for Sparse Linear Systems)
+    //computing r0 := b - A*x0
+    vector<double> res = MathTools::vectorSub(rhs, A.SpMV(x));
+    //z0 := inv(M) * r0
+    vector<double> z(res.size());
+    M.apply(z, res);
+
+    //p0 := z0
+    vector<double> searchDirn = z;
+
+    double resz = MathTools::innerProd(z, res);
+    double r0 = MathTools::L2Norm(res);
+    double r = r0;
+    
+    if(r0 < std::numeric_limits<double>::epsilon()) return iter;
+    
+    while(iter < maxIter && r/r0 > tolarance){
+        vector<double> Ap = A.SpMV(searchDirn);
+
+        //alpha(j) := tr(r(j))*z(j) / (tr(p(j) * A * p(j))
+        double alpha = resz/MathTools::innerProd(searchDirn, Ap);
+
+        //x(j+1) := x(j) + alpha(j) * p(j)
+        MathTools::daxpy(x, alpha, searchDirn);
+
+        //r(j+1) := r(j) - alpha(j)*A*p(j)
+        MathTools::daxpy(res, -alpha, Ap);
+        //z(j+1) := inv(M) * r(j+1)
+        M.apply(z, res);
+
+        double curr_resz = MathTools::innerProd(z, res);
+        //beta(j) := tr(r(j+1))*z(j+1) / (tr(r(j)) * z(j))
+        double beta = curr_resz/resz;
+
+        //p(j+1) := z(j+1) + beta(j) * p(j)
+        searchDirn = MathTools::vectorAdd(z, MathTools::scalarMultiply(beta, searchDirn));
+
+        r = MathTools::L2Norm(res);
+
+        resz = curr_resz;
+
+        iter++;
+    }
+
+    return iter;
+}
+
+int LinearSolvers::PBiCGStab
+(
+    const Matrix& A,
+    const Preconditioners& M,
+    std::vector<double>& x,
+    const std::vector<double>& rhs,
+    double tolerance
+)
+{
+    int maxIter = 10000, iter = 0;
+
+    int n = x.size();
+    vector<double> p_(n, 0.0), v(n, 0.0), s(n, 0.0), s_(n, 0.0), t(n, 0.0);
+
+    //brief PBiCGStab (Barrett R. - Templates for solution of Linear Systems,
+    //                 Building block for iterative methods)
+
+    //First iteration is performed out of loop
+    //r(0) = b - A*x(0)
+    vector<double> res = MathTools::vectorSub(rhs, A.SpMV(x));
+    //choosing r~ = r(0)
+    vector<double> res_ = res;
+
+    //p1 = r0 (initial search direction taken to be r0)
+    vector<double> searchDirn = res;
+
+    //rho0 = r~^T * r(0) 
+    double currRho = MathTools::innerProd(res_, res);
+
+    //inital residual
+    double r0 = MathTools::L2Norm(res), r = r0;
+    if(r0 < std::numeric_limits<double>::epsilon()) return iter;
+
+    while(iter < maxIter){
+
+        //preconditioning search direction
+        M.apply(p_, searchDirn);
+
+        //v = A*p (storing just for convinience)
+        v = A.SpMV(p_);
+
+        //step length alpha = r~^T * r / r~^T * A*p = rho / r~^T * v
+        double alpha = currRho/MathTools::innerProd(res_, v);
+
+        //s = r - alpha *  v
+        s = res;
+        MathTools::daxpy(s, -alpha, v);
+
+        //checking the norm of s 
+        if(MathTools::L2Norm(s)/r0 < tolerance){
+            //if it's small enough, updating x and exiting
+            MathTools::daxpy(x, alpha, p_);
+            return iter;
+        }
+
+        //preconditioning s
+        M.apply(s_, s);
+
+        //t = A * preconditioned s
+        t = A.SpMV(s_);
+
+        //omega = t^T * s / t^T * t
+        double omega = MathTools::innerProd(t, s)/MathTools::innerProd(t, t);
+
+        if(abs(omega) < 1e-15){//for continuation it is necessary omega =/ 0
+            cout << "PBiCGStab method fails\n";
+            return iter;
+        }
+
+        //updating x
+        //x = x + alpha * p_ + omega * s_
+        MathTools::daxpy(x, alpha, p_);
+        MathTools::daxpy(x, omega, s_);
+
+        //updating the residual 
+        //r = s - omega * t
+        res = s;
+        MathTools::daxpy(res, -omega, t);
+
+        //calculate the Norm
+        r = MathTools::L2Norm(res);
+
+        if(r/r0 < tolerance) return iter;//no need to update next direction if converged
+
+        //to update the search direction for next iteration
+        double prevRho = currRho;
+        currRho = MathTools::innerProd(res_, res);
+
+        if(abs(currRho) < 1e-15){
+            cout << "PBiCGStab Method failed\n";
+            return iter;
+        }
+
+        //beta = rho(i)/rho(i-1) * (alpha/omega)
+        double beta = (currRho/prevRho) * (alpha/omega);
+
+        //p = p - omega * v
+        MathTools::daxpy(searchDirn, -omega, v);
+        //p = res + beta * p
+        searchDirn = MathTools::vectorAdd(res, MathTools::scalarMultiply(beta, searchDirn));
+        
+        iter++;
+    }
+
+    return iter;
+}
+
+int LinearSolvers::steepestDescent
+(
+    const Matrix& A,
+    vector<double>& x,
+    const vector<double>& rhs, 
+    double tolerance
+)
+{
+    int maxIter = 10000, iter = 0;
+
+    vector<double> Ar(x.size());
+    vector<double> res = MathTools::vectorSub(rhs, A.SpMV(x));
+
+    double r0 = MathTools::L2Norm(res), r = r0;
+    if(r0 < std::numeric_limits<double>::epsilon()) return iter;
+
+    while(iter < maxIter && r/r0 > tolerance){
+        Ar = A.SpMV(res);
+        double alpha = MathTools::innerProd(res, res);
+        alpha /= MathTools::innerProd(res, Ar);
+
+        //update x
+        MathTools::daxpy(x, -alpha, res);
+
+        //update residual
+        MathTools::daxpy(res, alpha, Ar);
+
+        //calcualte norm
+        r = MathTools::L2Norm(res);
+
+        iter++;
+    }
+
+    return iter;
 }
