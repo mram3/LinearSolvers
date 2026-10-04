@@ -23,5 +23,24 @@ public:
         const std::vector<double>& v2
     );
 
+    static double innerProd
+    (
+        const std::vector<double>& v1,
+        const std::vector<double>& v2
+    );
+
+    static std::vector<double> scalarMultiply
+    (
+        double scalar,
+        const std::vector<double>& v
+    );
+
+    static void daxpy
+    (
+        std::vector<double>& x,
+        const double a,
+        const std::vector<double>& y
+    );
+
 };
 #endif
