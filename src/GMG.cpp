@@ -1,5 +1,4 @@
 #include "GMG.h"
-#include "LinearSolvers.h"
 
 using namespace std;
 
@@ -64,7 +63,56 @@ std::vector<double> GMG::prolongErr
     return currErr;
 }
 
-void GMG::vCycle
+void GMG::runCycles
+(
+    int lvl,
+    vector<Equations>& levels,
+    vector<double>& x,
+    const vector<double>& rhs,
+    Cycle cycle
+)
+{
+    int n = levels.size();
+    if(lvl == n-1){
+        Smoothers::gaussSeidel(levels[lvl].A, rhs, x, 50);
+        return;
+    }
+
+    //Pre Sweeps
+    //Few Gauss iterations on finer grids
+    Smoothers::gaussSeidel(levels[lvl].A, rhs, x, 3);
+
+    //calculating the residual at current level
+    vector<double> currRes = MathTools::vectorSub(rhs, levels[lvl].A.SpMV(x));
+
+    //restricting the residual to next coarse level
+    vector<double> nextRes = restrictRes(levels[lvl].mesh, levels[lvl+1].mesh, currRes);
+
+    //initiating error array for next coarse level
+    vector<double> error(levels[lvl+1].b.size());
+
+    switch (cycle){
+        case Cycle::vCycle:
+            runCycles(lvl+1, levels, error, nextRes, Cycle::vCycle);
+            break;
+        
+        case Cycle::wCycle:
+            runCycles(lvl+1, levels, error, nextRes, Cycle::wCycle);
+            runCycles(lvl+1, levels, error, nextRes, Cycle::wCycle);
+            break;
+        
+        case Cycle::fCycle:
+            runCycles(lvl+1, levels, error, nextRes, Cycle::fCycle);
+            runCycles(lvl+1, levels, error, nextRes, Cycle::vCycle);
+            break;
+    }
+
+    vector<double> errCorr = prolongErr(levels[lvl+1].mesh, levels[lvl].mesh, error);
+    x = MathTools::vectorAdd(x, errCorr);
+    Smoothers::gaussSeidel(levels[lvl].A, rhs, x, 3);
+}
+
+/*void GMG::vCycle
 (
     vector<Equations>& levels,
     vector<double>& x
@@ -76,7 +124,7 @@ void GMG::vCycle
 
     //1. Pre Sweeps
     //Few Gauss Seidel iteration on fine grid to eliminate high frequency errors
-    LinearSolvers::gaussSeidel(levels[0].A, levels[0].b, x, 3); //smoother
+    Smoothers::gaussSeidel(levels[0].A, levels[0].b, x, 3); //smoother
 
     //2. Restirction (Going down to coarse grids)
     residuals[0] = MathTools::vectorSub(levels[0].b, levels[0].A.SpMV(x));
@@ -88,11 +136,11 @@ void GMG::vCycle
         error[i].assign(levels[i+1].b.size(), 0.0);
 
         if(i == nLevels - 2){
-            LinearSolvers::gaussSeidel(levels[i+1].A, residuals[i+1], error[i], 50);
+            Smoothers::gaussSeidel(levels[i+1].A, residuals[i+1], error[i], 50);
             continue;
         }
 
-        LinearSolvers::gaussSeidel(levels[i+1].A, residuals[i+1], error[i], 3);
+        Smoothers::gaussSeidel(levels[i+1].A, residuals[i+1], error[i], 3);
 
         residuals[i+1] = MathTools::vectorSub(residuals[i+1], levels[i+1].A.SpMV(error[i]));
     }
@@ -109,29 +157,10 @@ void GMG::vCycle
         
         error[j-1] = MathTools::vectorAdd(error[j-1], errCorr);
 
-        LinearSolvers::gaussSeidel(levels[j].A, residuals[j], error[j-1], 3);
+        Smoothers::gaussSeidel(levels[j].A, residuals[j], error[j-1], 3);
     }
 
     //4.Correction and final iterations 
     //Post Sweeps
-    LinearSolvers::gaussSeidel(levels[0].A, levels[0].b, x, 3);
-}
-
-void GMG::wCycle
-(
-    vector<Equations>& levels,
-    vector<double>& x
-)
-{
-    int n = levels[0].b.size(), nLevels = levels.size();
-    vector<vector<double>> residuals(nLevels);
-    vector<vector<double>> error(nLevels-1);
-
-    //1. Pre Sweeps
-    //Few Gauss Seidel iteration on fine grid to eliminate high frequency errors
-    LinearSolvers::gaussSeidel(levels[0].A, levels[0].b, x, 3); //smoother
-
-    //2. Restirction (Going down to coarse grids)
-    residuals[0] = MathTools::vectorSub(levels[0].b, levels[0].A.SpMV(x));
-    
-}
+    Smoothers::gaussSeidel(levels[0].A, levels[0].b, x, 3);
+}*/

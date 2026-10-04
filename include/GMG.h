@@ -1,25 +1,20 @@
 #pragma once
 
 #include "Equations.h"
+#include "Type.h"
+#include "Smoothers.h"
+#include "MathTools.h"
 
 class GMG
 {
 public:
-    static void vCycle
+    static void runCycles
     (
-        std::vector<Equations>& level,
-        std::vector<double>& result
-    );
-
-    static void wCycle
-    (
-        std::vector<Equations>& level,
-        std::vector<double>& result
-    );
-    static void fCycle
-    (
-        std::vector<Equations>& level,
-        std::vector<double>& result
+        int lvl,
+        std::vector<Equations>& levels,
+        std::vector<double>& x,
+        const std::vector<double>& rhs,
+        Cycle cycle
     );
 
 private:
