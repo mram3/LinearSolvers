@@ -66,12 +66,14 @@ vector<double> Matrix::SpMV
 ) const
 {
     int n = rowPtr.size() - 1;
-    vector<double> r;
-    r.assign(n, 0.0);
+    vector<double> r(n);
+
     for(int i = 0; i<n; ++i){
+        double sum = 0.0;
         for(int j = rowPtr[i]; j < rowPtr[i+1]; ++j){
-            r[i] += values[j] * x[col[j]];
+            sum += values[j] * x[col[j]];
         }
+        r[i] = sum;
     }
 
     return r;
