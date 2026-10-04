@@ -65,3 +65,13 @@ void Equations::assemblePoissonMatrix()
     //Comprssing COO to CSR
     A.compressToCSR();
 }
+
+void Equations::assembleConvectionDiffusionEquation()
+{
+    int Nx =  mesh->Nx, Ny = mesh->Ny, rowIdx;
+
+    double dx = mesh->dx, dy = mesh->dy;
+    double xmin = mesh->xmin, xmax = mesh->xmax, ymin = mesh->ymin, ymax = mesh->ymax;
+
+    
+}
