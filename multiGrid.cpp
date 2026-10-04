@@ -12,17 +12,17 @@ using namespace std;
 using namespace std::chrono;
 
 int main(){
-    int Nx = 200;
-    int Ny = 200;
+    int Nx = 4096;
+    int Ny = 4096;
     double xmin = 0.0, xmax = 1.0;
     double ymin = 0.0, ymax = 1.0;
     int nCells = Nx*Ny;
 
-    int nLevels = 4;
+    int nLevels = 8;
     int divisor = pow(2, nLevels-1);
 
     if(Nx % divisor != 0 || Ny % divisor != 0){
-        cout << "Cell counts must be divisible by " << divisor <<" to have "<< nLevels<< " levels";
+        cout << "Cell counts must be divisible by " << divisor <<" to have "<< nLevels<< " levels\n";
         return 1;
     }
     
@@ -47,7 +47,21 @@ int main(){
     auto start = high_resolution_clock::now();
     int iterV = solve.GMG(levels, x, 1e-6, Cycle::vCycle);
     auto end = high_resolution_clock::now();
-    double time = duration<double, milli>(end - start).count();
+    double timeV = duration<double, milli>(end - start).count();
 
-    cout << iterV << " " << time << endl;
+    fill(x.begin(), x.end(), 0.0);
+    start = high_resolution_clock::now();
+    int iterW = solve.GMG(levels, x, 1e-6, Cycle::wCycle);
+    end = high_resolution_clock::now();
+    double timeW = duration<double, milli>(end - start).count();
+
+    fill(x.begin(), x.end(), 0.0);
+    start = high_resolution_clock::now();
+    int iterF = solve.GMG(levels, x, 1e-6, Cycle::fCycle);
+    end = high_resolution_clock::now();
+    double timeF = duration<double, milli>(end - start).count();
+
+    cout << iterV << " " << timeV << endl;
+    cout << iterW << " " << timeW << endl;
+    cout << iterF << " " << timeF << endl;
 }
