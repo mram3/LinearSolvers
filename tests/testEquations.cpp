@@ -9,11 +9,12 @@ Compiling Instructions: g++ tests/testEquations.cpp src/*.cpp -Iinclude -std=c++
 using namespace std;
 
 int main(){
-    int nx = 3, ny = 2, nCells = nx*ny;
-    Grid mesh(nx, ny, 0.0, 1.5, 0.0, 1.0);
-    Equations eqn;
+    int nx = 3, ny = 3, nCells = nx*ny;
+    Grid mesh(nx, ny, 0.0, 1.0, 0.0, 1.0);
+    Equations eqn(&mesh);
 
-    eqn.assemblePoissonMatrix(mesh);
+    //eqn.assemblePoissonMatrix();
+    eqn.assembleConvectionDiffusionEquation();
 
     //Unpacking CSR into a Dense Matrix
     std::vector<std::vector<double>> M(nx*ny, std::vector<double>(nx*ny, 0.0));
